@@ -22,7 +22,9 @@ import time
 # Load models
 MODEL_PATH = "cheating_detection_cnn.h5"  # Replace with your model path
 model = tf.keras.models.load_model(MODEL_PATH)
-yolo_model = YOLO("yolov8n.pt")           # Replace with your YOLO weights if necessary
+# yolo_model = YOLO("yolov8n.pt")          
+model = YOLO("yolov8n.yaml") 
+model.load("yolov8n.pt")   
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 
