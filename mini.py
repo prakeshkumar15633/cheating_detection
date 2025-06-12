@@ -34,29 +34,34 @@ from_password = "pmnu rqdj sfns mvdl"     # 🔁 Replace with your app password
 # ----------------------------
 # Helper functions
 def normalize_pose(keypoints):
-    left_shoulder = keypoints[11*3:(11*3)+3]
-    right_shoulder = keypoints[12*3:(12*3)+3]
+    """Rotates keypoints so shoulders are aligned horizontally."""
+    left_shoulder = keypoints[11 * 3: (11 * 3) + 3]
+    right_shoulder = keypoints[12 * 3: (12 * 3) + 3]
+
     dx = right_shoulder[0] - left_shoulder[0]
     dy = right_shoulder[1] - left_shoulder[1]
-    angle = -atan2(dy, dx)
-    rotated = []
+    angle = -atan2(dy, dx)  # Compute rotation angle
+
+    keypoints_rotated = []
     for i in range(0, len(keypoints), 3):
         x, y, z = keypoints[i], keypoints[i+1], keypoints[i+2]
-        x_new = x*np.cos(angle) - y*np.sin(angle)
-        y_new = x*np.sin(angle) + y*np.cos(angle)
-        rotated.extend([x_new, y_new, z])
-    return np.array(rotated)
+        x_new = x * np.cos(angle) - y * np.sin(angle)
+        y_new = x * np.sin(angle) + y * np.cos(angle)
+        keypoints_rotated.extend([x_new, y_new, z])
+    
+    return np.array(keypoints_rotated)
 
 def detect_persons(image):
+    """Detects all persons in the image using YOLOv8 with confidence filtering."""
     results = yolo_model(image)
-    det = results[0].boxes
+    detections = results[0].boxes  # Bounding boxes
     persons = []
-    for box, conf, cls in zip(det.xyxy.cpu().numpy(),
-                              det.conf.cpu().numpy(),
-                              det.cls.cpu().numpy()):
-        if int(cls) == 0 and conf > 0.35:
+
+    for box, conf, cls in zip(detections.xyxy.cpu().numpy(), detections.conf.cpu().numpy(), detections.cls.cpu().numpy()):
+        if int(cls) == 0 and conf > 0.35:  # Class 0 = 'person', Confidence > 35%
             xmin, ymin, xmax, ymax = map(int, box)
             persons.append((xmin, ymin, xmax, ymax))
+    
     return persons
 
 def analyze_frame(frame, detection_threshold=0.5):
@@ -110,6 +115,7 @@ def send_email_alert(to_email, subject="Cheating Alert", body="Cheating detected
 # ----------------------------
 # Streamlit UI configuration
 st.set_page_config(page_title="Cheating Detection", page_icon="📸", layout="wide")
+
 st.markdown("""
     <style>
         body { background-color: #121212; color: #fff; font-family: "Helvetica Neue", sans-serif; }
@@ -126,8 +132,79 @@ emails = st.sidebar.text_input(
     "📧 Enter email(s) to receive alerts",
     placeholder="example1@gmail.com, example2@gmail.com"
 )
+email_list = [e.strip() for e in emails.split(",") if e.strip()]
+
+theme_mode = st.sidebar.selectbox("🌃 Theme", ("Dark", "Light"))
+
+# Apply Theme CSS
+if theme_mode == "Dark":
+    st.markdown("""
+        <style>
+            .block-container {
+                background-color: #121212;
+                color: #ffffff;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                color: #ffffff;
+            }
+            .stTextInput > div > input,
+            .stFileUploader > div > div {
+                background-color: #1e1e1e;
+                color: #ffffff;
+                border-radius: 8px;
+            }
+            .stButton > button {
+                background-color: #0078d4;
+                color: white;
+                font-weight: bold;
+                padding: 15px 32px;
+                border-radius: 8px;
+            }
+            .stButton > button:hover {
+                background-color: #005a8d;
+            }
+            .stMarkdown, .stWrite, .stText {
+                color: #bbbbbb;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+            .block-container {
+                background-color: #ffffff;
+                color: #000000;
+            }
+            h1, h2, h3, h4, h5, h6 {
+                color: #000000;
+            }
+            .stTextInput > div > input,
+            .stFileUploader > div > div {
+                background-color: #ffffff;
+                color: #000000;
+                border-radius: 8px;
+            }
+            .stButton > button {
+                background-color: #0078d4;
+                color: white;
+                font-weight: bold;
+                padding: 15px 32px;
+                border-radius: 8px;
+            }
+            .stButton > button:hover {
+                background-color: #005a8d;
+            }
+            .stMarkdown, .stWrite, .stText {
+                color: #222222;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
 
 mode = st.sidebar.radio("Select Mode", ("Upload File", "Real-Time Webcam Feed"))
+frame_gap = st.sidebar.slider("Frame Sampling Gap", 1, 100, 30, 1)
+
+
 detection_threshold = st.sidebar.slider("Cheating Detection Threshold", 0.0, 1.0, 0.5, 0.05)
 
 st.title("🎥 **Cheating Detection from Video, Image or Live Webcam**")
@@ -144,7 +221,7 @@ if mode == "Upload File":
         tfile.write(uploaded_video.read())
         cap = cv2.VideoCapture(tfile.name)
         frame_count = 0
-        gap = 30  # Process every 30th frame
+        
         fps = cap.get(cv2.CAP_PROP_FPS)
         saved_frames = []
         stframe = st.empty()
@@ -155,7 +232,7 @@ if mode == "Upload File":
                 ret, frame = cap.read()
                 if not ret:
                     break
-                if frame_count % gap == 0:
+                if frame_count % frame_gap == 0:
                     processed_frame, cheating = analyze_frame(frame, detection_threshold)
                     timestamp = str(timedelta(seconds=int(frame_count / fps)))
                     if cheating:
@@ -298,6 +375,14 @@ elif mode == "Real-Time Webcam Feed":
 
                     # Toast notification
                     st.toast("🚨 Cheating detected on webcam!")
+                    # Voice Alert (Play Sound)
+                    st.components.v1.html("""
+                    <audio autoplay>
+                    <source src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" type="audio/ogg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    """, height=0)
+
 
                     # Save frame for report
                     path = os.path.join(temp_dir, f"cheat_frame_{frame_count}.jpg")
