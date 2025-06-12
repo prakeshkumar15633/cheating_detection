@@ -7,4 +7,4 @@ numpy==1.23.5
 Pillow
 matplotlib
 altair==4.2.2
-protobuf==4.21.12
+protobuf==4.25.3
