@@ -14,17 +14,25 @@ from email.mime.base import MIMEBase
 from email import encoders
 
 # ----------------------------
-# Load models
-MODEL_PATH = "cheating_detection_cnn.h5"  # Replace with your model path
-model = tf.keras.models.load_model(MODEL_PATH)
-yolo_model = YOLO("yolov8n")
+# Load models with caching to save memory
+@st.cache(allow_output_mutation=True)
+def load_cnn_model():
+    return tf.keras.models.load_model("cheating_detection_cnn.h5")
+
+@st.cache(allow_output_mutation=True)
+def load_yolo_model():
+    return YOLO("yolov8n")
+
+model = load_cnn_model()
+yolo_model = load_yolo_model()
+
 mp_pose = mp.solutions.pose
 pose = mp_pose.Pose(static_image_mode=True, min_detection_confidence=0.5)
 
 # ----------------------------
 # Email sender config
 from_email = "sahilmadan0508@gmail.com"
-from_password = ""
+from_password = ""  # Move this to Streamlit secrets for security
 
 # ----------------------------
 # Helper functions
@@ -128,7 +136,6 @@ st.title("🎥 **Cheating Detection from Image**")
 # ----------------------------
 # Mode: File Upload
 if mode == "Upload File":
-    # Disabled video upload
     st.file_uploader("Upload a video", type=["mp4", "mov", "avi"], disabled=True)
     st.error("🚫 Video upload unavailable on Streamlit Cloud.")
     st.markdown(
@@ -136,7 +143,6 @@ if mode == "Upload File":
         unsafe_allow_html=True
     )
 
-    # Image upload below
     uploaded_image = st.file_uploader("Or upload an image (Max 1MB)",
                                       type=["jpg", "jpeg", "png"],
                                       label_visibility="collapsed")
@@ -151,7 +157,6 @@ if mode == "Upload File":
             st.image(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB),
                     caption="Processed Image", use_column_width=True)
 
-            # Convert processed image to PNG bytes for download
             processed_pil = Image.fromarray(cv2.cvtColor(processed_img, cv2.COLOR_BGR2RGB))
             from io import BytesIO
             buf = BytesIO()
@@ -180,7 +185,6 @@ if mode == "Upload File":
 # ----------------------------
 # Mode: Webcam
 elif mode == "Real-Time Webcam Feed":
-    # Disabled webcam buttons
     col1, col2 = st.columns(2)
     with col1:
         st.button("📷 Start Webcam", disabled=True)
