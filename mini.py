@@ -1,4 +1,6 @@
 import streamlit as st
+st.set_page_config(page_title="Cheating Detection", page_icon="📸", layout="wide")
+
 import cv2
 import numpy as np
 import mediapipe as mp
@@ -12,6 +14,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
+
 
 # ----------------------------
 # Load models with caching to save memory
